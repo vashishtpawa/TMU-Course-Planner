@@ -30,33 +30,8 @@ const PlannerModel = (() => {
         ['core-elective', 'Core elective', 4], ['open', 'Open elective', 4], ['unclassified', 'Unclassified', null]
       ].map(([id, name, target]) => ({ id, name, target, type: 'Primary' }))
     };
-    addDefaultLawMinor(plan);
     plan.lawMinorInitialized = true;
-    plan.requirements.push({ id: 'slp', name: 'SLP', target: null, type: 'Other' });
     plan.slpInitialized = true;
-    return plan;
-  }
-
-  function samplePlan() {
-    const plan = emptyPlan();
-    plan.sample = true;
-    plan.years = [newYear(2025), newYear(2026)];
-    const add = (y, s, code, name, primary, status, difficulty, letter = '', gpa = null, tags = []) => {
-      plan.years[y].semesters[s].courses.push({ id: id(), code, name, primary, status, difficulty, letter, gpa, tags, professor: '', notes: '' });
-    };
-    add(0, 0, 'ITM 100', 'Foundations of Information Systems', 'core', 'Completed', 3, 'A−', 3.67);
-    add(0, 0, 'MHR 405', 'Organizational Behaviour', 'core', 'Completed', 2, 'A', 4);
-    add(0, 0, 'PSY 102', 'Introduction to Psychology I', 'lower', 'Completed', null, 'B+', 3.33);
-    add(0, 1, 'ITM 207', 'Computer-Enabled Problem Solving', 'core', 'Completed', 4, 'A−', 3.67);
-    add(0, 1, 'ACC 100', 'Introductory Financial Accounting', 'core', 'Completed', 3, 'B+', 3.33);
-    add(0, 1, 'LAW 122', 'Business Law', 'core', 'Completed', 3, 'A', 4);
-    add(1, 0, 'ITM 305', 'Systems Analysis and Design', 'core', 'In progress', 4);
-    add(1, 0, 'ITM 410', 'Business Process Management', 'core', 'In progress', 3);
-    add(1, 1, 'LAW 525', 'The Law of the Marketplace', 'open', 'Planned', null, '', null, ['law']);
-    add(1, 1, 'ITM 500', 'Data and Information Management', 'core', 'Planned', 4);
-    add(1, 2, 'PHL 214', 'Critical Thinking', 'lower', 'Planned', 2);
-    plan.years[1].semesters[2].work = { title: 'Co-op work term', employer: '', status: 'Planned', notes: '', number: 1 };
-    plan.years[0].semesters[1].notes = 'Example note: attended the campus technology club.';
     return plan;
   }
 
@@ -208,7 +183,7 @@ const PlannerModel = (() => {
 
   return {
     requirementTypes, minorTarget, coursesForProgress,
-    statuses, courseStatuses, isFailingGrade, unscheduledId, key, id, newYear, emptyPlan, samplePlan, sortYears,
+    statuses, courseStatuses, isFailingGrade, unscheduledId, key, id, newYear, emptyPlan, sortYears,
     allSemesters, allCourses, countStatuses, requirementCourses, moveCourse, bulkUpdate, validatePlan, suggestMove, nextWorkNumber
   };
 })();

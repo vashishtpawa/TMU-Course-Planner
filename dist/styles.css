@@ -236,3 +236,16 @@ input[type="color"] { width:52px; height:34px; padding:3px; cursor:pointer; }
 
 .import-drop { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:12px; padding:12px; border:1px dashed var(--muted); border-radius:8px; color:var(--muted); }
 .import-drop.is-dragging { border-color:var(--blue); background:var(--blue-tint); color:var(--blue); }
+
+.transcript-drop { margin:0 0 20px; }
+.transcript-drop strong { color:var(--ink); }
+.transcript-drop p { font-size:13px; }
+dialog:has(.transcript-review) { width:min(860px, calc(100% - 24px)); }
+.transcript-rows { display:grid; gap:12px; }
+.transcript-row { border:1px solid var(--line); border-radius:10px; padding:12px; }
+.transcript-row .section-head { margin-bottom:4px; }
+.transcript-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:8px; border:0; padding:4px 0 0; }
+.transcript-fields > label:last-child { grid-column:1 / -1; }
+.transcript-fields textarea { min-height:36px; height:46px; }
+.transcript-conflict { color:var(--danger); font-size:13px; }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }

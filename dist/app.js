@@ -1,7 +1,7 @@
 const {
   requirementTypes, minorTarget, coursesForProgress,
   allCourses, allSemesters, bulkUpdate, countStatuses, courseStatuses, emptyPlan, id, isFailingGrade, key, moveCourse,
-  newYear, requirementCourses, samplePlan, sortYears, statuses, suggestMove, unscheduledId, validatePlan, nextWorkNumber
+  newYear, requirementCourses, sortYears, statuses, suggestMove, unscheduledId, validatePlan, nextWorkNumber
 } = PlannerModel;
 
 const paths = {
@@ -34,6 +34,8 @@ const toast = document.querySelector('#toast');
 const nav = document.querySelector('#nav');
 const theme = document.querySelector('#theme');
 const fileInput = document.querySelector('#import-file');
+const transcriptInput = document.querySelector('#transcript-file');
+let readingTranscript = false;
 const pages = [
   ['planner', 'Year planner', 'grid'], ['progress', 'Degree progress', 'chart'],
   ['assistant', 'Planning assistant', 'spark'], ['settings', 'Settings & data', 'settings']
@@ -58,7 +60,7 @@ try {
 
 try {
   const stored = localStorage.getItem(key);
-  plan = stored ? validatePlan(JSON.parse(stored)) : samplePlan();
+  plan = stored ? validatePlan(JSON.parse(stored)) : emptyPlan();
 } catch {
   plan = emptyPlan();
   loadMessage = 'The saved plan could not be loaded. You can restore a JSON backup in Settings & data.';
@@ -213,15 +215,19 @@ function planner() {
     <small>${cgpa.count ? 'Unweighted · all graded attempts' : 'No numeric grades yet'}</small></div>
     <div class="hero-art" aria-hidden="true"><div class="art-grid"><div class="art-top"></div><div class="art-cells">${'<span></span>'.repeat(6)}</div></div></div></header>
     <div class="stats" aria-label="Course totals">${overview()}</div>
+    <div class="import-drop transcript-drop" data-import-drop="transcript">
+      <div><strong>Drop a TMU transcript PDF here</strong><p>Review your courses before adding them. The PDF is processed on this device.</p></div>
+      ${button('Import transcript', 'import-transcript', { cls: 'primary' })}
+    </div>
     <div class="section-head"><div><h2>Academic timeline</h2><p>${plan.years.length} academic ${plan.years.length === 1 ? 'year' : 'years'}${plan.sample ? ' · Sample plan' : ''}</p></div>
       ${button('Add year', 'add-year', { symbol: 'plus', cls: 'primary' })}</div>
-    ${plan.sample ? `<div class="sample-banner"><span><strong>Sample plan</strong> · These entries illustrate the planner. You can edit them or start fresh.</span>${button('Start fresh', 'clear', { cls: 'plain' })}</div>` : ''}
+    ${plan.sample ? `<div class="sample-banner"><span><strong>Sample plan</strong> · This saved plan contains example entries.</span>${button('Start fresh', 'clear', { cls: 'plain' })}</div>` : ''}
     <div class="selection-bar" hidden><span role="status"></span>
       ${button('Edit classifications', 'classify-selected', { cls: 'primary' })}
       ${button('Clear selection', 'clear-selection')}</div>
     ${plan.years.length ? `<div class="timeline"><div class="term-head" aria-hidden="true"><span>Fall</span><span>Winter</span><span>Summer</span></div>
       ${plan.years.map(yearCard).join('')}</div>`
-      : '<div class="empty-state"><h3>No academic years yet</h3><p>Add a year to begin scheduling courses.</p></div>'}
+      : '<div class="empty-state"><h3>No academic years yet</h3><p>Add a year to schedule courses, import a transcript, or add an unscheduled course below.</p></div>'}
     ${unscheduledCourses()}`;
 }
 
@@ -282,7 +288,7 @@ function settings() {
     <section class="panel"><div class="section-head"><div><h2>Requirements</h2><p>Each course gets one primary classification and can have multiple additional tags.</p></div>${button('Add category', 'requirement', { symbol: 'plus', cls: 'primary' })}</div>
     <div class="settings-list">${plan.requirements.map(req => `<div><span><strong>${escape(req.name)}</strong><small>${req.type} · ${req.target === null ? 'No target' : `Target ${req.target}`}</small></span>${button('Edit', 'requirement', { args: [req.id], title: `Edit ${req.name}` })}</div>`).join('')}</div>${verifyNote}</section>
     <section class="panel"><h2>Plan data</h2><p>Your plan is saved in this browser on this device. Clearing browser storage can erase it. Export a JSON backup to restore your plan or transfer it to another device.</p>
-    <div class="import-drop" data-import-drop>
+    <div class="import-drop" data-import-drop="json">
       <span>Drop a JSON backup here</span>${button('Import JSON', 'import')}
     </div>
     <div class="button-row">${button('Export JSON', 'export', { cls: 'primary' })}${button('Clear all data', 'clear', { cls: 'danger-outline' })}</div></section>`;
@@ -741,6 +747,7 @@ const actions = {
     notify('JSON backup exported.', Boolean(undo));
   },
   import: () => fileInput.click(),
+  'import-transcript': () => transcriptInput.click(),
   clear: () => confirm('Clear planner data?', 'This removes every academic year, course, work term, note, and custom requirement. Default classifications and settings will be restored.', 'Clear data', () => {
     commit(() => { plan = emptyPlan(); }, 'Planner cleared.', true);
   })
@@ -778,6 +785,186 @@ document.addEventListener('click', event => {
   actions[action](a0, a1, a2);
 });
 
+const transcriptSeasons = ['Fall', 'Winter', 'Summer'];
+const normalizeCourseCode = code => code.trim().toUpperCase().replace(/\s+/g, '');
+const sameTranscriptCourse = (course, code) => normalizeCourseCode(course.code) === normalizeCourseCode(code);
+
+function findTranscriptSemester(targetPlan, season, year) {
+  return allSemesters(targetPlan).find(sem => sem.term === season && sem.calendar === year);
+}
+
+function ensureTranscriptSemester(targetPlan, season, calendar) {
+  const existing = findTranscriptSemester(targetPlan, season, calendar);
+  if (existing) return existing;
+  const start = season === 'Fall' ? calendar : calendar - 1;
+  let year = targetPlan.years.find(entry => entry.semesters[0].calendar === start);
+  if (!year) {
+    year = newYear(start);
+    targetPlan.years.push(year);
+  }
+  const semester = year.semesters.find(entry => entry.term === season);
+  if (semester.calendar !== calendar) {
+    // A custom calendar year already occupies this slot. Keep that semester intact.
+    const added = newYear(start);
+    targetPlan.years.push(added);
+    return added.semesters.find(entry => entry.term === season);
+  }
+  return semester;
+}
+
+function transcriptReview({ entries, unparsed }) {
+  const rows = entries.map((entry, index) => {
+    const semester = findTranscriptSemester(plan, entry.season, entry.year);
+    const duplicate = semester?.courses.some(course => sameTranscriptCourse(course, entry.code));
+    const conflict = entry.work && semester?.work;
+    const needsStatus = entry.warnings.some(warning => warning.startsWith('Withdrawn') || warning.startsWith('Special')) &&
+      !(entry.work && entry.grade === 'PSD');
+    const initial = duplicate || conflict || needsStatus || !entry.season || !entry.grade ? 'skip' : entry.work ? 'work' : 'course';
+    const caption = [entry.code, entry.name].filter(Boolean).join(' · ');
+    return `<article class="transcript-row" data-transcript-row>
+      <div class="section-head"><h3>${escape(caption)}</h3>
+        ${select('Import as', 'action', initial, [['skip', 'Skip'], ['course', 'Course'], ...(entry.work ? [['work', 'Work term']] : [])])}
+      </div>
+      <p class="fine-print">${escape(['PDF page ' + entry.page, ...entry.warnings].join(' · '))}</p>
+      <p class="fine-print transcript-conflict" data-transcript-conflict hidden></p>
+      <fieldset class="transcript-fields" ${initial === 'skip' ? 'disabled' : ''}>
+        <legend class="sr-only">Fields for entry ${index + 1}</legend>
+        ${select('Term', 'season', entry.season ?? '', [['', 'Choose a term'], ...transcriptSeasons.map(value => [value, value])])}
+        ${input('Year', 'year', entry.year, 'type="number" min="1901" max="9998" step="1" required')}
+        ${input('Course code', 'code', entry.code, required)}
+        ${input('Course name', 'name', entry.name)}
+        ${input('Grade', 'grade', entry.grade)}
+        ${input('Grade points', 'gpa', entry.gpa, 'type="number" min="0" max="4.33" step="any"')}
+        ${input('Credit earned', 'credit', entry.credit, 'type="number" min="0" step="any"')}
+        ${statusField(entry.status, courseStatuses)}
+        ${textarea('Transcript notes', 'notes', entry.notes.join('\n'))}
+      </fieldset>
+    </article>`;
+  }).join('');
+
+  openDialog('Review transcript', `<form class="transcript-review">
+    <p>Check the extracted fields and choose what to import. Your PDF stays on this device.</p>
+    <p class="fine-print">The planner uses a simple GPA average. TMU can apply credits, repeat rules, and other adjustments to its official GPA.</p>
+    ${unparsed ? `<p class="transcript-conflict">${unparsed} ${unparsed === 1 ? 'row needs' : 'rows need'} review because some fields could not be read confidently.</p>` : ''}
+    <p class="fine-print">Potential duplicates start as Skip. Choose Course to add a separate attempt. If a semester already has a work term, choose Course or Skip.</p>
+    <div class="transcript-rows">${rows}</div>
+    <p class="transcript-conflict" data-transcript-error role="alert" hidden></p>
+    <div class="form-actions"><div>${button('Cancel', 'close')}<button class="primary" type="submit">Import selected entries</button></div></div>
+  </form>`);
+
+  const review = dialog.querySelector('form');
+  const rowElements = [...review.querySelectorAll('[data-transcript-row]')];
+  const field = (row, name) => row.querySelector(`[name="${name}"]`);
+  const value = (row, name) => field(row, name).value.trim();
+  const error = review.querySelector('[data-transcript-error]');
+  const showError = message => {
+    error.textContent = message;
+    error.hidden = !message;
+  };
+
+  function refreshReview(warnOnDuplicateChange = false) {
+    const workTermKeys = new Set();
+    for (const row of rowElements) {
+      const action = field(row, 'action');
+      const season = value(row, 'season');
+      const year = Number(value(row, 'year'));
+      const code = value(row, 'code');
+      const semester = findTranscriptSemester(plan, season, year);
+      const duplicate = semester?.courses.some(course => sameTranscriptCourse(course, code));
+      if (warnOnDuplicateChange && duplicate && row.dataset.duplicate !== 'true') action.value = 'skip';
+      row.dataset.duplicate = String(Boolean(duplicate));
+      const selectedWork = action.value === 'work';
+      const key = `${season} ${year}`;
+      const workConflict = selectedWork && (semester?.work || workTermKeys.has(key));
+      if (selectedWork) workTermKeys.add(key);
+      row.querySelector('fieldset').disabled = action.value === 'skip';
+      field(row, 'season').required = true;
+      field(row, 'action').setCustomValidity(workConflict ? 'A work term already occupies this semester. Choose Course or Skip.' : '');
+      const message = row.querySelector('[data-transcript-conflict]');
+      message.textContent = workConflict
+        ? 'This semester already has a work term. Choose Course or Skip.'
+        : duplicate ? 'Potential duplicate in this semester. Choose Course to add another attempt.' : '';
+      if (!message.textContent && field(row, 'action').value === 'skip' && semester?.work &&
+          [...action.options].some(option => option.value === 'work')) {
+        message.textContent = 'This semester already has a work term. Choose Course or Skip.';
+      }
+      message.hidden = !message.textContent;
+    }
+  }
+
+  review.addEventListener('change', event => {
+    showError('');
+    refreshReview(['season', 'year', 'code'].includes(event.target.name));
+  });
+  refreshReview();
+
+  review.addEventListener('submit', event => {
+    event.preventDefault();
+    refreshReview(true);
+    if (!review.reportValidity()) return;
+    const selected = rowElements.filter(row => value(row, 'action') !== 'skip');
+    if (!selected.length) {
+      showError('Choose at least one entry to import.');
+      return;
+    }
+
+    const updated = structuredClone(plan);
+    for (const row of selected) {
+      const semester = ensureTranscriptSemester(updated, value(row, 'season'), Number(value(row, 'year')));
+      const code = value(row, 'code').toUpperCase();
+      const name = value(row, 'name');
+      const grade = value(row, 'grade');
+      const status = isFailingGrade(grade) ? 'Failed' : value(row, 'status');
+      const points = value(row, 'gpa');
+      const credit = value(row, 'credit');
+      const work = value(row, 'action') === 'work';
+      if (work && (semester.work || !statuses.includes(status))) {
+        showError('A conflicting or failed work term needs to be imported as a course or skipped.');
+        return;
+      }
+      const notes = [
+        work ? `Transcript code: ${code}` : '',
+        work && grade ? `Transcript grade: ${grade}` : '',
+        work && points ? `Entered grade points: ${points}` : '',
+        credit ? `Transcript credit earned: ${credit}` : '',
+        value(row, 'notes')
+      ].filter(Boolean).join('\n');
+      if (work) {
+        semester.work = { title: name || code, employer: '', status, notes, number: nextWorkNumber(updated) };
+      } else {
+        semester.courses.push({
+          id: id(), code, name, professor: '', status, primary: getReq('unclassified')?.id ?? '',
+          difficulty: null, letter: grade, gpa: points ? Number(points) : null, tags: [], notes
+        });
+      }
+      updated.years.find(year => year.semesters.includes(semester)).collapsed = false;
+    }
+    dialog.close();
+    commit(() => { plan = updated; }, `Imported ${selected.length} ${selected.length === 1 ? 'entry' : 'entries'}.`, true);
+  });
+}
+
+async function importTranscript(file) {
+  if (!file || readingTranscript) return;
+  if (location.protocol === 'file:') {
+    notify('Open the planner on localhost or Vercel to import a PDF. The PDF worker needs an HTTP page.', Boolean(undo));
+    return;
+  }
+  readingTranscript = true;
+  notify('Reading transcript on this device…', Boolean(undo));
+  try {
+    const { readTranscript } = await import('./transcript.mjs?v=1');
+    const result = await readTranscript(file);
+    toast.hidden = true;
+    transcriptReview(result);
+  } catch (error) {
+    const detail = error instanceof TypeError ? 'Check that the PDF import assets are available and try again.' : error.message;
+    notify(`Could not import the transcript. ${detail}`, Boolean(undo));
+  } finally {
+    readingTranscript = false;
+  }
+}
+
 async function importPlan(file) {
   if (!file) return;
   let imported;
@@ -796,6 +983,12 @@ fileInput.addEventListener('change', () => {
   const [file] = fileInput.files;
   fileInput.value = '';
   importPlan(file);
+});
+
+transcriptInput.addEventListener('change', () => {
+  const [file] = transcriptInput.files;
+  transcriptInput.value = '';
+  importTranscript(file);
 });
 
 content.addEventListener('dragover', event => {
@@ -818,10 +1011,11 @@ content.addEventListener('drop', event => {
   zone.classList.remove('is-dragging');
   const files = event.dataTransfer.files;
   if (files.length !== 1) {
-    notify('Drop one JSON backup at a time.', Boolean(undo));
+    notify('Drop one file at a time.', Boolean(undo));
     return;
   }
-  importPlan(files[0]);
+  if (zone.dataset.importDrop === 'transcript') importTranscript(files[0]);
+  else importPlan(files[0]);
 });
 
 content.addEventListener('contextmenu', event => {
