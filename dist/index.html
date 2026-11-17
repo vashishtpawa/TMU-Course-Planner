@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A personal course, work term, and degree progress planner for TMU students.">
+<title>TMU Course Planner</title>
+<link rel="stylesheet" href="styles.css?v=json-drop-import">
+<script defer src="model.js?v=json-drop-import"></script>
+<script defer src="app.js?v=json-drop-import"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<aside class="sidebar">
+  <div class="brand"><span id="brand-icon" class="brand-icon"></span><div>Course Planner<small>TMU · BTM</small></div></div>
+  <nav aria-label="Main navigation" id="nav"></nav>
+  <div class="sidebar-bottom"><p><span class="save-dot"></span><span id="save-status">Saved on this device</span></p><button id="theme" class="plain"></button></div>
+</aside>
+<main id="main" tabindex="-1">
+  <div id="content"></div>
+</main>
+<dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+<div id="toast" role="status" class="toast" hidden></div>
+<input id="import-file" type="file" accept=".json,application/json" hidden>
+</body>
+</html>
