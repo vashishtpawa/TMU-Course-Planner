@@ -403,10 +403,11 @@ function moveWork(source, destination) {
   }, `Work term moved to ${semLabel(destination)}.`, true);
 }
 
-function saveWork(sem, fields) {
+function saveWork(sem, fields, needsSemester = false) {
   commit(() => {
-    sem.work = {
-      number: sem.work?.number ?? nextWorkNumber(plan),
+    const destination = needsSemester ? ensureSemester(plan, fields.get('workSeason'), Number(fields.get('workYear'))) : sem;
+    destination.work = {
+      number: destination.work?.number ?? nextWorkNumber(plan),
       title: readText(fields, 'title'), employer: readText(fields, 'employer'),
       status: fields.get('status'), notes: readText(fields, 'notes')
     };
@@ -440,7 +441,12 @@ function courseForm(sem, course) {
     code: '', name: '', professor: '', status: 'Planned', primary: plan.requirements.find(req => req.id === 'unclassified')?.id ?? '',
     difficulty: null, letter: '', gpa: null, tags: [], notes: ''
   };
-  const canAddWork = !editing && sem.id !== unscheduledId && !sem.work;
+  const canAddWork = !editing && !sem.work;
+  const needsWorkSemester = canAddWork && sem.id === unscheduledId;
+  const workSemesterFields = needsWorkSemester ? `<div class="field-grid">
+    ${select('Work term semester', 'workSeason', 'Fall', ['Fall', 'Winter', 'Summer'].map(term => [term, term]))}
+    ${input('Work term year', 'workYear', new Date().getFullYear(), 'type="number" min="1901" max="9998" step="1" required')}
+  </div>` : '';
   form(editing ? 'Edit course' : 'Add course', `${canAddWork ? '<label class="work-toggle"><input type="checkbox" name="workTerm">Work term</label>' : ''}
     <p class="dialog-copy">${escape(semLabel(sem))}</p><fieldset class="entry-fields" data-course-fields><div class="field-grid">
     ${input('Course code', 'code', values.code, required)}${statusField(values.status, courseStatuses)}</div>
@@ -450,9 +456,9 @@ function courseForm(sem, course) {
     ${input('Letter grade', 'letter', values.letter)}${input('Numeric GPA', 'gpa', values.gpa, 'type="number" min="0" max="4.33" step="any"')}</div>
     ${additionalCategoryFields(values.tags)}
     ${textarea('Course notes', 'notes', values.notes)}</fieldset>
-    ${canAddWork ? `<fieldset class="entry-fields" data-work-fields hidden disabled>${workFields()}</fieldset>` : ''}`, 'Save course', fields => {
+    ${canAddWork ? `<fieldset class="entry-fields" data-work-fields hidden disabled>${workSemesterFields}${workFields()}</fieldset>` : ''}`, 'Save course', fields => {
       if (fields.has('workTerm')) {
-        saveWork(sem, fields);
+        saveWork(sem, fields, needsWorkSemester);
         return;
       }
       const letter = readText(fields, 'letter');
@@ -501,6 +507,16 @@ function courseForm(sem, course) {
     const courseFields = element.querySelector('[data-course-fields]');
     const placementFields = element.querySelector('[data-work-fields]');
     const submit = element.querySelector('[type="submit"]');
+    if (needsWorkSemester) {
+      const { workSeason, workYear } = element.elements;
+      const checkSemester = () => {
+        const occupied = findSemester(plan, workSeason.value, Number(workYear.value))?.work;
+        workYear.setCustomValidity(occupied ? 'This semester already has a work term. Choose another term or year.' : '');
+      };
+      workSeason.addEventListener('change', checkSemester);
+      workYear.addEventListener('input', checkSemester);
+      checkSemester();
+    }
     toggle.addEventListener('change', () => {
       const isWork = toggle.checked;
       courseFields.disabled = courseFields.hidden = isWork;
@@ -807,12 +823,12 @@ const transcriptSeasons = ['Fall', 'Winter', 'Summer'];
 const normalizeCourseCode = code => code.trim().toUpperCase().replace(/\s+/g, '');
 const sameTranscriptCourse = (course, code) => normalizeCourseCode(course.code) === normalizeCourseCode(code);
 
-function findTranscriptSemester(targetPlan, season, year) {
+function findSemester(targetPlan, season, year) {
   return allSemesters(targetPlan).find(sem => sem.term === season && sem.calendar === year);
 }
 
-function ensureTranscriptSemester(targetPlan, season, calendar) {
-  const existing = findTranscriptSemester(targetPlan, season, calendar);
+function ensureSemester(targetPlan, season, calendar) {
+  const existing = findSemester(targetPlan, season, calendar);
   if (existing) return existing;
   const start = season === 'Fall' ? calendar : calendar - 1;
   let year = targetPlan.years.find(entry => entry.semesters[0].calendar === start);
@@ -832,7 +848,7 @@ function ensureTranscriptSemester(targetPlan, season, calendar) {
 
 function transcriptReview({ entries, unparsed }) {
   const rows = entries.map((entry, index) => {
-    const semester = findTranscriptSemester(plan, entry.season, entry.year);
+    const semester = findSemester(plan, entry.season, entry.year);
     const duplicate = semester?.courses.some(course => sameTranscriptCourse(course, entry.code));
     const conflict = entry.work && semester?.work;
     const needsStatus = entry.warnings.some(warning => warning.startsWith('Withdrawn') || warning.startsWith('Special')) &&
@@ -887,7 +903,7 @@ function transcriptReview({ entries, unparsed }) {
       const season = value(row, 'season');
       const year = Number(value(row, 'year'));
       const code = value(row, 'code');
-      const semester = findTranscriptSemester(plan, season, year);
+      const semester = findSemester(plan, season, year);
       const duplicate = semester?.courses.some(course => sameTranscriptCourse(course, code));
       if (warnOnDuplicateChange && duplicate && row.dataset.duplicate !== 'true') action.value = 'skip';
       row.dataset.duplicate = String(Boolean(duplicate));
@@ -928,7 +944,7 @@ function transcriptReview({ entries, unparsed }) {
 
     const updated = structuredClone(plan);
     for (const row of selected) {
-      const semester = ensureTranscriptSemester(updated, value(row, 'season'), Number(value(row, 'year')));
+      const semester = ensureSemester(updated, value(row, 'season'), Number(value(row, 'year')));
       const code = value(row, 'code').toUpperCase();
       const name = value(row, 'name');
       const grade = value(row, 'grade');
