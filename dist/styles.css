@@ -48,8 +48,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand-icon svg { width:23px; height:23px; }
 .brand small { display:block; font-size:11px; letter-spacing:.075em; font-weight:750; }
 nav { display:grid; gap:5px; margin-top:34px; }
-nav a { display:flex; gap:10px; align-items:center; text-decoration:none; border-radius:9px; color:var(--muted); font-weight:650; padding:11px 10px; }
-nav a:hover, nav a[aria-current] { background:var(--blue-tint); color:var(--blue); }
+nav a, #about-link { display:flex; gap:10px; align-items:center; text-decoration:none; border-radius:9px; color:var(--muted); font-weight:650; padding:11px 10px; }
+nav a:hover, nav a[aria-current], #about-link:hover, #about-link[aria-current] { background:var(--blue-tint); color:var(--blue); }
 .sidebar-bottom { margin-top:auto; border-top:1px solid var(--line); padding:12px 4px 0; }
 .sidebar-bottom p { display:flex; align-items:center; gap:7px; margin:0 0 7px 5px; font-size:12px; }
 .save-dot { width:7px; height:7px; border-radius:50%; background:var(--complete-bar); }
@@ -144,6 +144,8 @@ main { margin-left:232px; padding:30px clamp(18px,3vw,46px) 55px; }
 .gpa { font-size:1.25rem; color:var(--ink); }
 .fine-print { font-size:12px; margin-top:10px; }
 .button-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.about-links { list-style:none; margin-bottom:0; padding:0; gap:8px 16px; color:var(--muted); }
+.about-links a { font-weight:650; text-underline-offset:2px; }
 .table-wrap { overflow-x:auto; }
 table { width:100%; border-collapse:collapse; margin-top:8px; }
 th,td { text-align:left; padding:7px; border-bottom:1px solid var(--line); }
@@ -172,14 +174,14 @@ legend { padding:0 4px; font-size:12px; font-weight:680; }
 @media (max-width:1040px) {
   .sidebar { width:190px; padding-inline:11px; }
   main { margin-left:190px; padding-inline:17px; }
-  nav a { font-size:13px; }
+  nav a, #about-link { font-size:13px; }
 }
 @media (max-width:790px) {
   .sidebar { position:static; width:auto; padding:10px 12px; border-right:0; border-bottom:1px solid var(--line); display:grid; grid-template-columns:1fr auto; gap:8px; }
   nav { grid-column:1 / -1; grid-row:2; display:flex; flex-wrap:wrap; margin:0; }
-  nav a { padding:7px; gap:5px; }
-  nav a svg { width:15px; height:15px; }
-  .sidebar-bottom { margin:0; border:0; display:flex; align-items:center; padding:0; }
+  nav a, #about-link { padding:7px; gap:5px; }
+  nav a svg, #about-link svg { width:15px; height:15px; }
+  .sidebar-bottom { margin:0; border:0; display:flex; flex-direction:column; align-items:flex-start; padding:0; }
   .sidebar-bottom p { display:none; }
   main { margin:0; padding-top:14px; }
   .hero { padding:19px; min-height:153px; }

@@ -10,6 +10,7 @@ const paths = {
   chart: 'M3 3v18h18M8 16v-4m5 4V8m5 8V5',
   spark: 'M12 2l2.6 7.4L22 12l-7.4 2.6L12 22l-2.6-7.4L2 12l7.4-2.6L12 2z',
   settings: 'M4 7h16M4 17h16M8 4v6m8 4v6',
+  info: 'M12 11v5m0-8h.01m9 4a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
   plus: 'M12 5v14M5 12h14',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   check: 'M5 12l4 4L19 6',
@@ -33,12 +34,15 @@ const dialog = document.querySelector('#dialog');
 const toast = document.querySelector('#toast');
 const nav = document.querySelector('#nav');
 const theme = document.querySelector('#theme');
+const aboutLink = document.querySelector('#about-link');
+aboutLink.insertAdjacentHTML('afterbegin', icon('info'));
 const fileInput = document.querySelector('#import-file');
 const transcriptInput = document.querySelector('#transcript-file');
 let readingTranscript = false;
 const pages = [
   ['planner', 'Year planner', 'grid'], ['progress', 'Degree progress', 'chart'],
-  ['assistant', 'Planning assistant', 'spark'], ['settings', 'Settings & data', 'settings']
+  ['assistant', 'Planning assistant', 'spark'], ['settings', 'Settings & data', 'settings'],
+  ['about', 'About']
 ];
 let plan;
 let loadMessage;
@@ -294,9 +298,23 @@ function settings() {
     <div class="button-row">${button('Export JSON', 'export', { cls: 'primary' })}${button('Clear all data', 'clear', { cls: 'danger-outline' })}</div></section>`;
 }
 
+function about() {
+  return pageTitle('About', 'Map your courses and work terms and track your degree progress.') +
+    `<section class="panel" aria-labelledby="about-author">
+    <h2 id="about-author">Made by Vashisht Pawa</h2>
+    <ul class="button-row about-links">
+      <li><a href="https://www.linkedin.com/in/vpawa">LinkedIn</a></li>
+      <li><a href="https://github.com/vashishtpawa">GitHub</a></li>
+      <li><span>Website — Coming soon</span></li>
+    </ul>
+    ${verifyNote}</section>`;
+}
+
 function render() {
-  nav.innerHTML = pages.map(([name, label, symbol]) => `<a href="#${name}" ${page === name ? 'aria-current="page"' : ''}>${icon(symbol)}<span>${label}</span></a>`).join('');
-  content.innerHTML = ({ planner, progress, assistant, settings })[page]();
+  nav.innerHTML = pages.filter(([name]) => name !== 'about').map(([name, label, symbol]) => `<a href="#${name}" ${page === name ? 'aria-current="page"' : ''}>${icon(symbol)}<span>${label}</span></a>`).join('');
+  if (page === 'about') aboutLink.setAttribute('aria-current', 'page');
+  else aboutLink.removeAttribute('aria-current');
+  content.innerHTML = ({ planner, progress, assistant, settings, about })[page]();
   if (page === 'planner') updateSelection();
 }
 
